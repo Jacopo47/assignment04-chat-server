@@ -1,21 +1,75 @@
 package model
 
+import io.vertx.core.http.HttpMethod
 import io.vertx.lang.scala.json.JsonObject
-import io.vertx.scala.ext.web.RoutingContext
+import io.vertx.scala.ext.web.{Router, RoutingContext}
 
 
 trait Request {
-  def routingContext: RoutingContext
+  def router: Router
 
   def url: String
 
-  def handler: (RoutingContext, ResponseIf) => Unit
+  def method: HttpMethod
 
   def data: JsonObject
 
-  def res = new ResponseIf(1) {
-    responseJson(routingContext, data)
+  def res: ConsumeBeforeRes
+
+  def handle: (RoutingContext, JsonObject, ConsumeBeforeRes) => Unit
+
+  def handler(): Unit = {
+    res.setData(data)
+    router.route(method, url).produces("application/json").handler(handle(_, data, res))
   }
+}
+
+case class GET(override val router: Router,
+               override val url: String,
+               override val handle: (RoutingContext, JsonObject, ConsumeBeforeRes) => Unit,
+               override val data: JsonObject = new JsonObject(),
+               override val res: ConsumeBeforeRes = ConsumeBeforeRes()) extends Request {
+  override val method = HttpMethod.GET
+
+  handler()
+}
+
+case class POST(override val router: Router,
+               override val url: String,
+               override val handle: (RoutingContext, JsonObject, ConsumeBeforeRes) => Unit,
+               override val data: JsonObject = new JsonObject(),
+               override val res: ConsumeBeforeRes = ConsumeBeforeRes()) extends Request {
+  override val method = HttpMethod.POST
+
+  handler()
+}
+
+case class ConsumeBeforeRes() {
+  private var counter: Int = 0
+  private var limit = 1
+  private var routingContext: RoutingContext = _
+  private var data: JsonObject = _
+
+  def consume(): Unit = {
+    counter += 1
+    if (counter == limit) {
+      responseJson(routingContext, data)
+      counter = 0
+      limit = 1
+      data.clear()
+    }
+  }
+
+  def initialize(routingContext: RoutingContext, limit: Int): Unit = {
+    setRoutingContext(routingContext)
+    setLimit(limit)
+  }
+
+  def setRoutingContext(routingContext: RoutingContext): Unit = this.routingContext = routingContext
+
+  def setLimit(limit: Int): Unit = this.limit = limit
+
+  def setData(data: JsonObject): Unit = this.data = data
 
   private def responseJson(routingContext: RoutingContext, json: JsonObject): Unit = {
     routingContext.response()
@@ -26,19 +80,4 @@ trait Request {
   }
 }
 
-class ResponseIf(consumerLimit: Int)(res: => Unit) {
-  private var counter: Int = 0
-  private var limit = consumerLimit
 
-  def consume(): Unit = {
-    counter += 1
-    if (counter == limit) res
-  }
-
-  def setLimit(limit: Int): Unit = this.limit = limit
-}
-
-
-private case class GET(routingContext: RoutingContext, url: String, method: RoutingContext => Unit) {
-
-}
