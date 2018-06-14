@@ -2,9 +2,8 @@ package controller
 
 import java.net.InetSocketAddress
 
-import akka.actor.Props
+import akka.actor.{ActorSystem, Props}
 import controller.Utility._
-import io.vertx.core.http.HttpMethod
 import io.vertx.lang.scala.ScalaVerticle
 import io.vertx.lang.scala.json.{JsonArray, JsonObject}
 import io.vertx.scala.ext.web.{Router, RoutingContext}
@@ -14,13 +13,15 @@ import redis.actors.RedisSubscriberActor
 import redis.api.pubsub.{Message, PMessage}
 
 import scala.collection.mutable
+import scala.util.{Failure, Success}
 
 object Utility {
   val applicationJson: String = "application/json"
   val USER = "user:"
   val CHATS = "chats"
-  val HOST: String = "localhost"
-  val PORT: Int = 6379
+  var HOST: String = "localhost"
+  var PORT: Int = 6379
+  var PASSWORD: Option[String] = Some("")
   val channels = Seq()
   val patterns = Seq("chat.*")
   val CHAT_ID = "chatId"
@@ -39,58 +40,50 @@ class ConsumeThenRes(limit: Int)(res: => Unit) {
 
 
 class Dispatcher extends ScalaVerticle {
-  implicit val akkaSystem = akka.actor.ActorSystem()
+  implicit val akkaSystem: ActorSystem = akka.actor.ActorSystem()
 
 
   override def start(): Unit = {
-    val router = Router.router(vertx)
+
+    vertx.fileSystem().readFileFuture("../../res/redisConfig.json") onComplete {
+      case Success(result) => {
+        val app = result.toJsonObject
+        HOST = app.getString("host")
+        PORT = app.getInteger("port").intValue()
+        PASSWORD = Some(app.getString("password"))
+
+        val router = Router.router(vertx)
 
 
-    GET(router, "/type/:id", routingGETRequest)
-    /*router.route(HttpMethod.GET, "/type/:id")
-      .produces(applicationJson)
-      .handler(routingGETRequest(_))*/
-    GET(router, "/user/:id", getUserData)
-    /*router.route(HttpMethod.GET, "/user/:id")
-      .produces(applicationJson)
-      .handler(getUserData(_))*/
+        GET(router, "/type/:id", routingGETRequest)
 
-    POST(router, "/user/:id", setUserData)
-    /*router.route(HttpMethod.POST, "/user/:id")
-      .produces(applicationJson)
-      .handler(setUserData(_))*/
+        GET(router, "/user/:id", getUserData)
 
+        POST(router, "/user/:id", setUserData)
 
-    GET(router, "/user/:id/chats", getUserChats)
-    /*router.route(HttpMethod.GET, "/user/:id/chats")
-      .produces(applicationJson)
-      .handler(getUserChats(_))*/
+        GET(router, "/user/:id/chats", getUserChats)
 
-    POST(router, "/user/:id/chats", addChat)
-    /*router.route(HttpMethod.POST, "/user/:id/chats")
-      .produces(applicationJson)
-      .handler(addChat(_))*/
+        POST(router, "/user/:id/chats", addChat)
 
-    GET(router, "/chats/:id", getChat)
-    /*router.route(HttpMethod.GET, "/chats/:id")
-      .produces(applicationJson)
-      .handler(getChat(_))*/
+        GET(router, "/chats/:id", getChat)
 
-    GET(router, "/chats/new/", newChatID)
-    /*router.route(HttpMethod.GET, "/chats/new/")
-      .produces(applicationJson)
-      .handler(newChatID(_))*/
+        GET(router, "/chats/new/", newChatID)
 
-    GET(router, "/user/:id/exist", existUser)
-    /*router.route(HttpMethod.GET, "/user/:id/exist")
-      .produces(applicationJson)
-      .handler(existUser(_))*/
+        GET(router, "/user/:id/exist", existUser)
 
 
-    vertx.createHttpServer()
-      .requestHandler(router.accept _).listen(4700)
+        vertx.createHttpServer()
+          .requestHandler(router.accept _).listen(4700)
 
-    akkaSystem.actorOf(Props(classOf[SubscribeActor], channels, patterns))
+        akkaSystem.actorOf(Props(classOf[SubscribeActor], channels, patterns))
+
+      }
+
+      case Failure(cause) => {
+        println(cause.getCause + "\nDetails: " + cause.getMessage)
+      }
+    }
+
 
   }
 
@@ -100,20 +93,16 @@ class Dispatcher extends ScalaVerticle {
   private val getUserData: (RoutingContext, JsonObject, ConsumeBeforeRes) => Unit = (routingContext, data, res) => {
     res.initialize(routingContext, 1)
 
-    val redis = RedisClient(HOST, PORT)
-    val id = USER + routingContext.request().getParam("id").getOrElse("")
-    println("id: " + id)
+    val redis = RedisClient(HOST, PORT, PASSWORD)
+    val id = USER + routingContext.request().getParam("id").getOrElse("").trim
+
     redis.exists(id).map(result => {
       if (result) {
         redis.hgetall(id).map(userData => {
           data.put(RESULT, true)
           data.put("user", new JsonObject())
 
-          userData foreach { case (k, v) => {
-            println("K: " + k + " / " + v.utf8String)
-            data.getJsonObject("user").put(k, v.utf8String)
-          }
-          }
+          userData foreach { case (k, v) => data.getJsonObject("user").put(k, v.utf8String) }
           res.consume()
         })
       } else {
@@ -133,16 +122,16 @@ class Dispatcher extends ScalaVerticle {
     */
   private val setUserData: (RoutingContext, JsonObject, ConsumeBeforeRes) => Unit = (routingContext, data, res) => {
     res.initialize(routingContext, 1)
-    val redis = RedisClient(HOST, PORT)
+    val redis = RedisClient(HOST, PORT, PASSWORD)
 
     val params = new mutable.HashMap[String, String]
     routingContext.queryParams().names().foreach(e => {
       routingContext.request().getParam(e) match {
-        case Some(value) => if (!value.isEmpty) params.put(e, value.trim)
+        case Some(value) => if (!value.isEmpty) params.put(e.trim, value.trim)
       }
     })
 
-    val id: String = USER + routingContext.request().getParam("id").get
+    val id: String = USER + routingContext.request().getParam("id").getOrElse("").trim
 
     redis.hmset(id, params.toMap).map(result => {
       data.put(RESULT, result)
@@ -165,7 +154,7 @@ class Dispatcher extends ScalaVerticle {
     */
   private val getUserChats: (RoutingContext, JsonObject, ConsumeBeforeRes) => Unit = (routingContext, data, res) => {
     res.initialize(routingContext, 1)
-    val redis = RedisClient(HOST, PORT)
+    val redis = RedisClient(HOST, PORT, PASSWORD)
 
 
     val id: String = USER + routingContext.request().getParam("id").getOrElse("")
@@ -199,15 +188,15 @@ class Dispatcher extends ScalaVerticle {
     *
     * Result:
     * TRUE se:
-    *     - esiste la chat e ne restituisce gli elementi in un JsonArray (chat) con elementi: timestamp (Long) e msg (String)
+    *     - esiste la chat e ne restituisce gli elementi in un JsonArray (chat) con elementi: timestamp (Long) / msg (String) / sender (String)
     * FALSE se
     *     - non esiste la chat
     */
-  private val getChat:(RoutingContext, JsonObject, ConsumeBeforeRes) => Unit = (routingContext, data, res) => {
+  private val getChat: (RoutingContext, JsonObject, ConsumeBeforeRes) => Unit = (routingContext, data, res) => {
     res.initialize(routingContext, 1)
-    val redis = RedisClient(HOST, PORT)
+    val redis = RedisClient(HOST, PORT, PASSWORD)
 
-    val id = CHATS + ":" + routingContext.request().getParam("id").getOrElse("")
+    val id = CHATS + ":" + routingContext.request().getParam("id").getOrElse("").trim
 
     redis.exists(id).map(result => {
       if (result) {
@@ -216,7 +205,11 @@ class Dispatcher extends ScalaVerticle {
         redis.lrange(id, 0, -1).map(msgList => {
           msgList.foreach(e => {
             val msg = new JsonObject(e.utf8String)
-            data.getJsonArray("chat").add(new JsonObject().put("timestamp", msg.getLong("timestamp")).put("msg", msg.getString("msg")))
+            data.getJsonArray("chat")
+              .add(new JsonObject()
+                .put("timestamp", msg.getLong("timestamp"))
+                .put("msg", msg.getString("msg"))
+                .put("sender", msg.getString("sender")))
           })
           res.consume()
         })
@@ -243,14 +236,13 @@ class Dispatcher extends ScalaVerticle {
     *     - la chat è già presente tra quelle dell'utente
     *
     */
-  private val addChat:(RoutingContext, JsonObject, ConsumeBeforeRes) => Unit = (routingContext, data, res) => {
+  private val addChat: (RoutingContext, JsonObject, ConsumeBeforeRes) => Unit = (routingContext, data, res) => {
     res.initialize(routingContext, 1)
-    val redis = new RedisClient(HOST, PORT)
+    val redis = RedisClient(HOST, PORT, PASSWORD)
 
 
-
-    val id: String = USER + routingContext.request().getParam("id").get
-    val chat: String = routingContext.request.getParam("chat").getOrElse("")
+    val id: String = USER + routingContext.request().getParam("id").get.trim
+    val chat: String = routingContext.request.getParam("chat").getOrElse("").trim
 
     if (chat.trim.isEmpty) {
       data.put(RESULT, false)
@@ -286,9 +278,9 @@ class Dispatcher extends ScalaVerticle {
     * Resistisce alla chiave 'id' un valore univoco da associare alla chat.
     *
     */
-  private val newChatID:(RoutingContext, JsonObject, ConsumeBeforeRes) => Unit = (routingContext, data, res) => {
+  private val newChatID: (RoutingContext, JsonObject, ConsumeBeforeRes) => Unit = (routingContext, data, res) => {
     res.initialize(routingContext, 1)
-    val redis = RedisClient(HOST, PORT)
+    val redis = RedisClient(HOST, PORT, PASSWORD)
 
     redis.incr(CHAT_ID).map(newChatID => {
       data.put("id", newChatID)
@@ -303,10 +295,10 @@ class Dispatcher extends ScalaVerticle {
     * Alla chiave result associa true se l'utente esiste, false altrimenti
     *
     */
-  private val existUser:(RoutingContext, JsonObject, ConsumeBeforeRes) => Unit = (routingContext, data, res) => {
+  private val existUser: (RoutingContext, JsonObject, ConsumeBeforeRes) => Unit = (routingContext, data, res) => {
     res.initialize(routingContext, 1)
-    val redis = RedisClient(HOST, PORT)
-    val id: String = USER + routingContext.request().getParam("id").get
+    val redis = RedisClient(HOST, PORT, PASSWORD)
+    val id: String = USER + routingContext.request().getParam("id").getOrElse("").trim
     redis.exists(id).map(exists => {
       if (exists) {
         data.put(RESULT, true)
@@ -326,7 +318,7 @@ class Dispatcher extends ScalaVerticle {
       data.put("vals", new JsonArray())
 
 
-      val redis = RedisClient(HOST, PORT)
+      val redis = RedisClient(HOST, PORT, PASSWORD)
 
 
       val future = redis.get("foo")
@@ -391,16 +383,17 @@ class Dispatcher extends ScalaVerticle {
 
 class SubscribeActor(channels: Seq[String] = Nil, patterns: Seq[String] = Nil)
   extends RedisSubscriberActor(
-    new InetSocketAddress("localhost", 6379),
+    new InetSocketAddress(HOST, PORT),
     channels,
     patterns,
+    PASSWORD,
     onConnectStatus = connected => {
       println(s"connected: $connected")
     }) {
 
-  implicit val akkaSystem = akka.actor.ActorSystem()
+  implicit val akkaSystem: ActorSystem = akka.actor.ActorSystem()
 
-  val redis = RedisClient(HOST, PORT)
+  val redis = RedisClient(HOST, PORT, PASSWORD)
 
   def onMessage(message: Message) {
     println(s"message received: $message")
