@@ -1,1 +1,1 @@
-web: sbt run -Dhttp.port=${4700}
+web: target/universal/stage/bin/assignment04-chat-server -Dhttp.port=${4700}

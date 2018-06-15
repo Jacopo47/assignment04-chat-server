@@ -10,6 +10,8 @@ scalaSource in Test := baseDirectory.value / "src/test"
 
 resourceDirectory in Compile := baseDirectory.value / "res"
 
+enablePlugins(JavaAppPackaging)
+
 
 libraryDependencies += "io.vertx" %% "vertx-lang-scala" % "3.5.2"
 libraryDependencies += "io.vertx" %% "vertx-web-scala" % "3.5.2"
