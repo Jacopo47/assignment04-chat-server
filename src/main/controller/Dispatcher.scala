@@ -54,6 +54,7 @@ class Dispatcher extends ScalaVerticle {
 
         val router = Router.router(vertx)
 
+        GET(router, "/", hello)
 
         GET(router, "/type/:id", routingGETRequest)
 
@@ -87,6 +88,17 @@ class Dispatcher extends ScalaVerticle {
       }
     }
 
+
+  }
+
+  /**
+    * Restituisce i dati dell'utente, risponde a GET /user/:id
+    */
+  private val hello: (RoutingContext, JsonObject, ConsumeBeforeRes) => Unit = (routingContext, data, res) => {
+    res.initialize(routingContext, 1)
+
+    data.put(RESULT, "Hello to everyone")
+    res.consume()
 
   }
 
