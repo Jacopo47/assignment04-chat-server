@@ -17,4 +17,4 @@ libraryDependencies += "io.vertx" % "vertx-platform" % "2.1.5" % "provided"
 libraryDependencies += "com.chiradip.rediscl" % "redisclient_2.10" % "0.8"
 libraryDependencies += "com.github.etaty" %% "rediscala" % "1.8.0"
 
-libraryDependencies <+= scalaVersion("org.scala-lang" % "scala-compiler" % _ )
+//libraryDependencies <+= scalaVersion("org.scala-lang" % "scala-compiler" % _ )
