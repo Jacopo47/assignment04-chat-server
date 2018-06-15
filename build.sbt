@@ -1,4 +1,4 @@
-name := "assignment04-chat-server"
+name := """assignment04-chat-server"""
 
 version := "0.1"
 
@@ -16,3 +16,5 @@ libraryDependencies += "io.vertx" %% "vertx-web-scala" % "3.5.2"
 libraryDependencies += "io.vertx" % "vertx-platform" % "2.1.5" % "provided"
 libraryDependencies += "com.chiradip.rediscl" % "redisclient_2.10" % "0.8"
 libraryDependencies += "com.github.etaty" %% "rediscala" % "1.8.0"
+
+libraryDependencies <+= scalaVersion("org.scala-lang" % "scala-compiler" % _ )
