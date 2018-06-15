@@ -72,7 +72,7 @@ class Dispatcher extends ScalaVerticle {
 
 
     vertx.createHttpServer()
-      .requestHandler(router.accept _).listen(4700)
+      .requestHandler(router.accept _).listen(System.getenv("PORT").toInt)
 
     akkaSystem.actorOf(Props(classOf[SubscribeActor], channels, patterns))
 
