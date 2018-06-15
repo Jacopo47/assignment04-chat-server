@@ -1,0 +1,1 @@
+web: target/scala-2-12/classes/Main -Dhttp.port=${4700}
