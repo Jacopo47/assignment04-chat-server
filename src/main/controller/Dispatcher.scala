@@ -13,7 +13,6 @@ import redis.actors.RedisSubscriberActor
 import redis.api.pubsub.{Message, PMessage}
 
 import scala.collection.mutable
-import scala.util.{Failure, Success}
 
 object Utility {
   val applicationJson: String = "application/json"
@@ -45,48 +44,37 @@ class Dispatcher extends ScalaVerticle {
 
   override def start(): Unit = {
 
-    vertx.fileSystem().readFileFuture("redisCloudConfig.json") onComplete {
-      case Success(result) => {
-        val app = result.toJsonObject
-        HOST = app.getString("host")
-        PORT = app.getInteger("port").intValue()
-        PASSWORD = Some(app.getString("password"))
 
-        val router = Router.router(vertx)
-
-        GET(router, "/", hello)
-
-        GET(router, "/type/:id", routingGETRequest)
-
-        GET(router, "/user/:id", getUserData)
-
-        POST(router, "/user/:id", setUserData)
-
-        GET(router, "/user/:id/chats", getUserChats)
-
-        POST(router, "/user/:id/chats", addChat)
-
-        GET(router, "/chats/:id", getChat)
-
-        GET(router, "/chats/new/", newChatID)
-
-        GET(router, "/user/:id/exist", existUser)
+    HOST = System.getenv("REDIS_HOST")
+    PORT = System.getenv("REDIS_PORT").toInt
+    PASSWORD = Some(System.getenv("REDIS_PW"))
 
 
-        vertx.createHttpServer()
-          .requestHandler(router.accept _).listen(4700)
+    val router = Router.router(vertx)
 
-        akkaSystem.actorOf(Props(classOf[SubscribeActor], channels, patterns))
+    GET(router, "/", hello)
 
-      }
+    GET(router, "/type/:id", routingGETRequest)
 
-      case Failure(cause) => {
-        println(cause.getCause + "\nDetails: " + cause.getMessage)
-        HOST = System.getenv("REDIS_HOST")
-        PORT = System.getenv("REDIS_PORT").toInt
-        PASSWORD = Some(System.getenv("REDIS_PW"))
-      }
-    }
+    GET(router, "/user/:id", getUserData)
+
+    POST(router, "/user/:id", setUserData)
+
+    GET(router, "/user/:id/chats", getUserChats)
+
+    POST(router, "/user/:id/chats", addChat)
+
+    GET(router, "/chats/:id", getChat)
+
+    GET(router, "/chats/new/", newChatID)
+
+    GET(router, "/user/:id/exist", existUser)
+
+
+    vertx.createHttpServer()
+      .requestHandler(router.accept _).listen(4700)
+
+    akkaSystem.actorOf(Props(classOf[SubscribeActor], channels, patterns))
 
 
   }
