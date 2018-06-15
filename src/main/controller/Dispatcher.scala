@@ -81,6 +81,9 @@ class Dispatcher extends ScalaVerticle {
 
       case Failure(cause) => {
         println(cause.getCause + "\nDetails: " + cause.getMessage)
+        HOST = System.getenv("REDIS_HOST")
+        PORT = System.getenv("REDIS_PORT").toInt
+        PASSWORD = Some(System.getenv("REDIS_PW"))
       }
     }
 
