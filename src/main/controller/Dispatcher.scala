@@ -126,9 +126,12 @@ class Dispatcher extends ScalaVerticle {
 
     val params = new mutable.HashMap[String, String]
     routingContext.queryParams().names().foreach(e => {
-      routingContext.request().getParam(e) match {
+      val value: String = routingContext.request().getParam(e).getOrElse("")
+
+      if (!value.isEmpty) params.put(e.trim, value.trim)
+      /*routingContext.request().getParam(e) match {
         case Some(value) => if (!value.isEmpty) params.put(e.trim, value.trim)
-      }
+      }*/
     })
 
     val id: String = USER + routingContext.request().getParam("id").getOrElse("").trim
