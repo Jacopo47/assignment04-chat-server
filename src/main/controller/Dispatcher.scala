@@ -45,7 +45,7 @@ class Dispatcher extends ScalaVerticle {
 
   override def start(): Unit = {
 
-    vertx.fileSystem().readFileFuture("../../res/redisConfig.json") onComplete {
+    vertx.fileSystem().readFileFuture("redisCloudConfig.json") onComplete {
       case Success(result) => {
         val app = result.toJsonObject
         HOST = app.getString("host")
