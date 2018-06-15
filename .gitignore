@@ -22,4 +22,5 @@ project/plugins/project/
 # Dati di accesso host redis
 
 res/redisCloudConfig.json
+.env
 *.env
