@@ -3,6 +3,7 @@ package model
 import io.vertx.core.http.HttpMethod
 import io.vertx.lang.scala.json.JsonObject
 import io.vertx.scala.ext.web.{Router, RoutingContext}
+import redis.RedisClient
 
 
 trait Request {
@@ -49,20 +50,25 @@ case class ConsumeBeforeRes() {
   private var limit = 1
   private var routingContext: RoutingContext = _
   private var data: JsonObject = _
+  private var redisClient: RedisClient = _
+
+
 
   def consume(): Unit = {
     counter += 1
     if (counter == limit) {
       responseJson(routingContext, data)
+      if (redisClient != null) redisClient.stop()
       counter = 0
       limit = 1
       data.clear()
     }
   }
 
-  def initialize(routingContext: RoutingContext, limit: Int): Unit = {
+  def initialize(routingContext: RoutingContext, limit: Int, redisClient: RedisClient = null): Unit = {
     setRoutingContext(routingContext)
     setLimit(limit)
+    setRedisClient(redisClient)
   }
 
   def setRoutingContext(routingContext: RoutingContext): Unit = this.routingContext = routingContext
@@ -70,6 +76,8 @@ case class ConsumeBeforeRes() {
   def setLimit(limit: Int): Unit = this.limit = limit
 
   def setData(data: JsonObject): Unit = this.data = data
+
+  def setRedisClient(redisClient: RedisClient): Unit = this.redisClient = redisClient
 
   private def responseJson(routingContext: RoutingContext, json: JsonObject): Unit = {
     routingContext.response()

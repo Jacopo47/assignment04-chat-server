@@ -94,9 +94,9 @@ class Dispatcher extends ScalaVerticle {
     * Restituisce i dati dell'utente, risponde a GET /user/:id
     */
   private val getUserData: (RoutingContext, JsonObject, ConsumeBeforeRes) => Unit = (routingContext, data, res) => {
-    res.initialize(routingContext, 1)
-
     val redis = RedisClient(HOST, PORT, PASSWORD)
+    res.initialize(routingContext, 1, redis)
+
     val id = USER + routingContext.request().getParam("id").getOrElse("").trim
 
     redis.exists(id).map(result => {
@@ -114,6 +114,7 @@ class Dispatcher extends ScalaVerticle {
         res.consume()
       }
     })
+
   }
 
   /**
@@ -124,8 +125,8 @@ class Dispatcher extends ScalaVerticle {
     *
     */
   private val setUserData: (RoutingContext, JsonObject, ConsumeBeforeRes) => Unit = (routingContext, data, res) => {
-    res.initialize(routingContext, 1)
     val redis = RedisClient(HOST, PORT, PASSWORD)
+    res.initialize(routingContext, 1, redis)
 
     val params = new mutable.HashMap[String, String]
     routingContext.queryParams().names().foreach(e => {
@@ -159,8 +160,8 @@ class Dispatcher extends ScalaVerticle {
     *
     */
   private val getUserChats: (RoutingContext, JsonObject, ConsumeBeforeRes) => Unit = (routingContext, data, res) => {
-    res.initialize(routingContext, 1)
     val redis = RedisClient(HOST, PORT, PASSWORD)
+    res.initialize(routingContext, 1, redis)
 
 
     val id: String = USER + routingContext.request().getParam("id").getOrElse("")
@@ -199,8 +200,8 @@ class Dispatcher extends ScalaVerticle {
     *     - non esiste la chat
     */
   private val getChat: (RoutingContext, JsonObject, ConsumeBeforeRes) => Unit = (routingContext, data, res) => {
-    res.initialize(routingContext, 1)
     val redis = RedisClient(HOST, PORT, PASSWORD)
+    res.initialize(routingContext, 1, redis)
 
     val id = CHATS + ":" + routingContext.request().getParam("id").getOrElse("").trim
 
@@ -243,8 +244,8 @@ class Dispatcher extends ScalaVerticle {
     *
     */
   private val addChat: (RoutingContext, JsonObject, ConsumeBeforeRes) => Unit = (routingContext, data, res) => {
-    res.initialize(routingContext, 1)
     val redis = RedisClient(HOST, PORT, PASSWORD)
+    res.initialize(routingContext, 1, redis)
 
 
     val id: String = USER + routingContext.request().getParam("id").get.trim
@@ -285,8 +286,8 @@ class Dispatcher extends ScalaVerticle {
     *
     */
   private val newChatID: (RoutingContext, JsonObject, ConsumeBeforeRes) => Unit = (routingContext, data, res) => {
-    res.initialize(routingContext, 1)
     val redis = RedisClient(HOST, PORT, PASSWORD)
+    res.initialize(routingContext, 1, redis)
 
     redis.incr(CHAT_ID).map(newChatID => {
       data.put("id", newChatID)
@@ -302,8 +303,9 @@ class Dispatcher extends ScalaVerticle {
     *
     */
   private val existUser: (RoutingContext, JsonObject, ConsumeBeforeRes) => Unit = (routingContext, data, res) => {
-    res.initialize(routingContext, 1)
     val redis = RedisClient(HOST, PORT, PASSWORD)
+    res.initialize(routingContext, 1, redis)
+
     val id: String = USER + routingContext.request().getParam("id").getOrElse("").trim
     redis.exists(id).map(exists => {
       if (exists) {
