@@ -290,7 +290,7 @@ class Dispatcher extends ScalaVerticle {
     res.initialize(routingContext, 1, redis)
 
     redis.incr(CHAT_ID).map(newChatID => {
-      data.put("id", newChatID)
+      data.put("id", newChatID.toString)
       res.consume()
     })
   }
