@@ -66,7 +66,7 @@ class Dispatcher extends ScalaVerticle {
 
     GET(router, "/chats/:id", getChat)
 
-    GET(router, "/chats/:id/head", )
+    GET(router, "/chats/:id/head", getChatData)
 
     GET(router, "/chats/new/", newChatID)
 
@@ -333,7 +333,7 @@ class Dispatcher extends ScalaVerticle {
   /**
     * Restituisce i dati della chat, risponde a GET /chats/:id/head
     */
-  private val getUserData: (RoutingContext, JsonObject, ConsumeBeforeRes) => Unit = (routingContext, data, res) => {
+  private val getChatData: (RoutingContext, JsonObject, ConsumeBeforeRes) => Unit = (routingContext, data, res) => {
     val redis = RedisClient(HOST, PORT, PASSWORD)
     res.initialize(routingContext, 1, redis)
 
