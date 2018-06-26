@@ -70,7 +70,7 @@ class Dispatcher extends ScalaVerticle {
 
     GET(router, "/chats/new/", newChatID)
 
-    POST(router, "/chats/:id", setChat)
+    POST(router, "/chats/:id/head", setChat)
 
     GET(router, "/user/:id/exist", existUser)
 
@@ -341,11 +341,11 @@ class Dispatcher extends ScalaVerticle {
 
     redis.exists(id).map(result => {
       if (result) {
-        redis.hgetall(id).map(userData => {
+        redis.hgetall(id).map(chatData => {
           data.put(RESULT, true)
-          data.put("user", new JsonObject())
+          data.put("chat", new JsonObject())
 
-          userData foreach { case (k, v) => data.getJsonObject("chat").put(k, v.utf8String) }
+          chatData foreach { case (k, v) => data.getJsonObject("chat").put(k, v.utf8String) }
           res.consume()
         })
       } else {
