@@ -66,7 +66,11 @@ class Dispatcher extends ScalaVerticle {
 
     GET(router, "/chats/:id", getChat)
 
+    GET(router, "/chats/:id/head", )
+
     GET(router, "/chats/new/", newChatID)
+
+    POST(router, "/chats/:id", setChat)
 
     GET(router, "/user/:id/exist", existUser)
 
@@ -295,6 +299,63 @@ class Dispatcher extends ScalaVerticle {
     })
   }
 
+
+  /**
+    * Imposta i dati dell'utente, prende tutti i paramatri passati all'url: POST /chats/:id/?
+    * e li associa alla chiave user:id
+    *
+    * Restituisce la chiave result che può essere TRUE o FALSE
+    *
+    */
+  private val setChat: (RoutingContext, JsonObject, ConsumeBeforeRes) => Unit = (routingContext, data, res) => {
+    val redis = RedisClient(HOST, PORT, PASSWORD)
+    res.initialize(routingContext, 1, redis)
+
+    val params = new mutable.HashMap[String, String]
+    routingContext.queryParams().names().foreach(e => {
+      val value: String = routingContext.request().getParam(e).getOrElse("")
+
+      if (!value.isEmpty) params.put(e.trim, value.trim)
+      /*routingContext.request().getParam(e) match {
+        case Some(value) => if (!value.isEmpty) params.put(e.trim, value.trim)
+      }*/
+    })
+
+    val id: String = CHATS + ":head:" + routingContext.request().getParam("id").getOrElse("").trim
+
+    redis.hmset(id, params.toMap).map(result => {
+      data.put(RESULT, result)
+      res.consume()
+    })
+
+  }
+
+  /**
+    * Restituisce i dati della chat, risponde a GET /chats/:id/head
+    */
+  private val getUserData: (RoutingContext, JsonObject, ConsumeBeforeRes) => Unit = (routingContext, data, res) => {
+    val redis = RedisClient(HOST, PORT, PASSWORD)
+    res.initialize(routingContext, 1, redis)
+
+    val id = CHATS + ":head:" + routingContext.request().getParam("id").getOrElse("").trim
+
+    redis.exists(id).map(result => {
+      if (result) {
+        redis.hgetall(id).map(userData => {
+          data.put(RESULT, true)
+          data.put("user", new JsonObject())
+
+          userData foreach { case (k, v) => data.getJsonObject("chat").put(k, v.utf8String) }
+          res.consume()
+        })
+      } else {
+        data.put(RESULT, false)
+        data.put("details", "La chat non esiste")
+        res.consume()
+      }
+    })
+
+  }
 
   /**
     * Risponde a GET /user/:id/exists
