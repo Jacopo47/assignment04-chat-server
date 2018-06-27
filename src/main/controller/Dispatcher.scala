@@ -64,6 +64,8 @@ class Dispatcher extends ScalaVerticle {
 
     POST(router, "/user/:id/chats", addChat)
 
+    POST(router, "/user/:id/removeChats", removeChat)
+
     GET(router, "/chats/:id", getChat)
 
     GET(router, "/chats/:id/head", getChatData)
@@ -275,6 +277,55 @@ class Dispatcher extends ScalaVerticle {
             //Inserimento fallito, chat già contenuta nel set
             data.put(RESULT, false)
             data.put("details", "Chat già presente per l'utente")
+          }
+          res.consume()
+        })
+      } else {
+        data.put(RESULT, false)
+        data.put("details", "L'utente non esiste")
+        res.consume()
+      }
+    })
+
+  }
+
+
+  /**
+    * Risponde all'url /user/:id/removeChats?chat=idChat
+    *
+    * È importante fornire il paramentro chat altimenti risponde con errore
+    *
+    * Ritorna:
+    * TRUE se la rimozione ha avuto successo
+    * FALSE se:
+    *     - la chat non è stata fornita
+    *     - l'utente non esiste
+    *
+    */
+  private val removeChat: (RoutingContext, JsonObject, ConsumeBeforeRes) => Unit = (routingContext, data, res) => {
+    val redis = RedisClient(HOST, PORT, PASSWORD)
+    res.initialize(routingContext, 1, redis)
+
+
+    val id: String = USER + routingContext.request().getParam("id").get.trim
+    val chat: String = routingContext.request.getParam("chat").getOrElse("").trim
+
+    if (chat.trim.isEmpty) {
+      data.put(RESULT, false)
+      data.put("details", "Non è stata indicata alcuna chat come parametro")
+      res.consume()
+    }
+
+    redis.exists(id).map(result => {
+      if (result) {
+        redis.srem(id + ":" + CHATS, chat).map(result => {
+          if (result > 0) {
+            //Rimozione riuscita
+            data.put(RESULT, true)
+          } else {
+            //Rimozione fallita chat non presente
+            data.put(RESULT, false)
+            data.put("details", "Chat non presente per l'utente")
           }
           res.consume()
         })
