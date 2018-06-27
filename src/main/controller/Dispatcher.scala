@@ -208,21 +208,25 @@ class Dispatcher extends ScalaVerticle {
     res.initialize(routingContext, 1, redis)
 
     val id = CHATS + ":" + routingContext.request().getParam("id").getOrElse("").trim
+    val headId = CHATS + ":head:" + routingContext.request().getParam("id").getOrElse("").trim
 
     redis.exists(id).map(result => {
       if (result) {
-        data.put(RESULT, true)
-        data.put("chat", new JsonArray())
-        redis.lrange(id, 0, -1).map(msgList => {
-          msgList.foreach(e => {
-            val msg = new JsonObject(e.utf8String)
-            data.getJsonArray("chat")
-              .add(new JsonObject()
-                .put("timestamp", msg.getLong("timestamp"))
-                .put("msg", msg.getString("msg"))
-                .put("sender", msg.getString("sender")))
+        redis.hget(headId, "title").map(title => {
+          data.put(RESULT, true)
+          data.put("title", title.get.utf8String)
+          data.put("chat", new JsonArray())
+          redis.lrange(id, 0, -1).map(msgList => {
+            msgList.foreach(e => {
+              val msg = new JsonObject(e.utf8String)
+              data.getJsonArray("chat")
+                .add(new JsonObject()
+                  .put("timestamp", msg.getLong("timestamp"))
+                  .put("msg", msg.getString("msg"))
+                  .put("sender", msg.getString("sender")))
+            })
+            res.consume()
           })
-          res.consume()
         })
       } else {
         data.put(RESULT, false)
