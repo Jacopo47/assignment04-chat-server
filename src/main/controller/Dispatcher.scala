@@ -26,6 +26,7 @@ object Utility {
   val CHAT_ID = "chatId"
   val RESULT = "result"
   val DETAILS = "details"
+  val MEMBERS = "members"
 }
 
 
@@ -216,18 +217,27 @@ class Dispatcher extends ScalaVerticle {
     */
   private val getChat: (RoutingContext, JsonObject, ConsumeBeforeRes) => Unit = (routingContext, data, res) => {
     val redis = RedisClient(HOST, PORT, PASSWORD)
-    res.initialize(routingContext, 1, redis, closeRedisClient)
+    res.initialize(routingContext, 2, redis, closeRedisClient)
 
-    val id = CHATS + ":" + routingContext.request().getParam("id").getOrElse("").trim
-    val headId = CHATS + ":head:" + routingContext.request().getParam("id").getOrElse("").trim
+    val id = routingContext.request().getParam("id").getOrElse("").trim
+    val chatId = CHATS + ":" + id
+    val headId = CHATS + ":head:" + id
+    val keyChatMembers = CHATS + ":" + id + ":members"
 
-    redis.exists(id).map(result => {
+    redis.exists(chatId).map(result => {
       if (result) {
+
+        redis.smembers(keyChatMembers).map(members => {
+          data.put(MEMBERS, new JsonArray())
+          members foreach( m => data.getJsonArray(MEMBERS).add(m.utf8String))
+          res.consume()
+        })
+
         redis.hget(headId, "title").map(title => {
           data.put(RESULT, true)
           data.put("title", title.get.utf8String)
           data.put("chat", new JsonArray())
-          redis.lrange(id, 0, -1).map(msgList => {
+          redis.lrange(chatId, 0, -1).map(msgList => {
             msgList.foreach(e => {
               val msg = new JsonObject(e.utf8String)
               data.getJsonArray("chat")
