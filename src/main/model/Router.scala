@@ -57,7 +57,7 @@ case class ConsumeBeforeRes() {
     counter += 1
     if (counter == limit) {
       responseJson(routingContext, data)
-       if (onCloseOperation != null) onCloseOperation(redisClient)
+      if (onCloseOperation != null) onCloseOperation(redisClient)
       counter = 0
       limit = 1
       data.clear()

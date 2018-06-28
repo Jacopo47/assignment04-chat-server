@@ -4,6 +4,7 @@ import java.net.InetSocketAddress
 
 import akka.actor.{ActorSystem, Props}
 import controller.Utility._
+import io.vertx.core.json.JsonObject
 import io.vertx.lang.scala.ScalaVerticle
 import io.vertx.lang.scala.json.{JsonArray, JsonObject}
 import io.vertx.scala.ext.web.{Router, RoutingContext}
@@ -228,8 +229,18 @@ class Dispatcher extends ScalaVerticle {
       if (result) {
 
         redis.smembers(keyChatMembers).map(members => {
+          res.addProducer(members.length)
           data.put(MEMBERS, new JsonArray())
-          members foreach( m => data.getJsonArray(MEMBERS).add(m.utf8String))
+          members foreach( m => {
+            redis.hget(USER + m.utf8String, "name").map(name => {
+              val user: JsonObject = new JsonObject()
+              user.put("id", m.utf8String)
+              user.put("name", name.get.utf8String)
+              data.getJsonArray(MEMBERS).add(user)
+
+              res.consume()
+            })
+          })
           res.consume()
         })
 
