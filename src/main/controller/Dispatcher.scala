@@ -25,6 +25,7 @@ object Utility {
   val patterns = Seq("chat.*")
   val CHAT_ID = "chatId"
   val RESULT = "result"
+  val DETAILS = "details"
 }
 
 
@@ -265,8 +266,8 @@ class Dispatcher extends ScalaVerticle {
     val redis = RedisClient(HOST, PORT, PASSWORD)
     res.initialize(routingContext, 1, redis, closeRedisClient)
 
-
-    val id: String = USER + routingContext.request().getParam("id").get.trim
+    val user: String = routingContext.request().getParam("id").get.trim
+    val id: String = USER + user
     val chat: String = routingContext.request.getParam("chat").getOrElse("").trim
 
     if (chat.trim.isEmpty) {
@@ -277,6 +278,22 @@ class Dispatcher extends ScalaVerticle {
 
     redis.exists(id).map(result => {
       if (result) {
+        //Era impostato un solo produttore nel caso in cui la chat non fosse indicata
+        //Arrivato a questo punto ne va aggiunto uno ulteriore visto le due chiamate da eseguire
+        res.addProducer()
+
+        val keyChatMembers = CHATS + ":" + chat + ":members"
+
+        redis.sadd(keyChatMembers, user).map(result => {
+          if (result > 0) {
+            data.put(RESULT + "_" +CHATS, true)
+          } else {
+            data.put(RESULT + "_" + CHATS, false)
+            data.put(DETAILS + "_" + CHATS, "Utente già presente tra i membri della chat")
+          }
+
+          res.consume()
+        })
         redis.sadd(id + ":" + CHATS, chat).map(result => {
           if (result > 0) {
             //Inserimento riuscito
@@ -315,7 +332,8 @@ class Dispatcher extends ScalaVerticle {
     res.initialize(routingContext, 1, redis, closeRedisClient)
 
 
-    val id: String = USER + routingContext.request().getParam("id").get.trim
+    val user: String = routingContext.request().getParam("id").get.trim
+    val id: String = USER + user
     val chat: String = routingContext.request.getParam("chat").getOrElse("").trim
 
     if (chat.trim.isEmpty) {
@@ -326,6 +344,22 @@ class Dispatcher extends ScalaVerticle {
 
     redis.exists(id).map(result => {
       if (result) {
+        //Era impostato un solo produttore nel caso in cui la chat non fosse indicata o l'utente non fosse presente
+        //Arrivato a questo punto ne va aggiunto uno ulteriore visto le due chiamate da eseguire
+        res.addProducer()
+
+        val keyChatMembers = CHATS + ":" + chat + ":members"
+
+        redis.srem(keyChatMembers, user).map(result => {
+          if (result > 0) {
+            data.put(RESULT + "_" + CHATS, true)
+          } else {
+            data.put(RESULT + "_" + CHATS, false)
+            data.put(DETAILS + "_" + CHATS, "Utente non presente tra i membri della chat")
+          }
+
+          res.consume()
+        })
         redis.srem(id + ":" + CHATS, chat).map(result => {
           if (result > 0) {
             //Rimozione riuscita

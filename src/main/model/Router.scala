@@ -78,6 +78,8 @@ case class ConsumeBeforeRes() {
   }
   def setRoutingContext(routingContext: RoutingContext): Unit = this.routingContext = routingContext
 
+  def addProducer(qta: Int = 1) = this.limit += qta
+
   def setLimit(limit: Int): Unit = this.limit = limit
 
   def setData(data: JsonObject): Unit = this.data = data
