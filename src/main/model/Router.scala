@@ -51,33 +51,31 @@ case class ConsumeBeforeRes() {
   private var routingContext: RoutingContext = _
   private var data: JsonObject = _
   private var redisClient: RedisClient = _
-
-
+  private var onCloseOperation: RedisClient => Unit = _
 
   def consume(): Unit = {
     counter += 1
     if (counter == limit) {
       responseJson(routingContext, data)
-      if (redisClient != null) {
-        redisClient.quit().map(fut => {
-          if (!fut) {
-            println("ERROR on closing connection")
-          }
-          redisClient.stop()
-        })
-      }
+       if (onCloseOperation != null) onCloseOperation(redisClient)
       counter = 0
       limit = 1
       data.clear()
     }
   }
 
-  def initialize(routingContext: RoutingContext, limit: Int, redisClient: RedisClient = null): Unit = {
+  def initialize(routingContext: RoutingContext, limit: Int, redisClient: RedisClient = null, onClose: RedisClient => Unit = null): Unit = {
     setRoutingContext(routingContext)
     setLimit(limit)
     setRedisClient(redisClient)
+    setOnClose(onClose)
   }
 
+  def initialize(routingContext: RoutingContext, limit: Int, onClose: RedisClient => Unit): Unit = {
+    setRoutingContext(routingContext)
+    setLimit(limit)
+    setOnClose(onClose)
+  }
   def setRoutingContext(routingContext: RoutingContext): Unit = this.routingContext = routingContext
 
   def setLimit(limit: Int): Unit = this.limit = limit
@@ -85,6 +83,8 @@ case class ConsumeBeforeRes() {
   def setData(data: JsonObject): Unit = this.data = data
 
   def setRedisClient(redisClient: RedisClient): Unit = this.redisClient = redisClient
+
+  def setOnClose(onClose: RedisClient => Unit): Unit = this.onCloseOperation = onClose
 
   private def responseJson(routingContext: RoutingContext, json: JsonObject): Unit = {
     routingContext.response()
