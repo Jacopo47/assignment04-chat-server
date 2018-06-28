@@ -4,7 +4,6 @@ import java.net.InetSocketAddress
 
 import akka.actor.{ActorSystem, Props}
 import controller.Utility._
-import io.vertx.core.json.JsonObject
 import io.vertx.lang.scala.ScalaVerticle
 import io.vertx.lang.scala.json.{JsonArray, JsonObject}
 import io.vertx.scala.ext.web.{Router, RoutingContext}
@@ -107,6 +106,7 @@ class Dispatcher extends ScalaVerticle {
       client.stop()
     })
   }
+
   /**
     * Restituisce i dati dell'utente, risponde a GET /user/:id
     */
@@ -227,23 +227,6 @@ class Dispatcher extends ScalaVerticle {
 
     redis.exists(chatId).map(result => {
       if (result) {
-
-        redis.smembers(keyChatMembers).map(members => {
-          res.addProducer(members.length)
-          data.put(MEMBERS, new JsonArray())
-          members foreach( m => {
-            redis.hget(USER + m.utf8String, "name").map(name => {
-              val user: JsonObject = new JsonObject()
-              user.put("id", m.utf8String)
-              user.put("name", name.get.utf8String)
-              data.getJsonArray(MEMBERS).add(user)
-
-              res.consume()
-            })
-          })
-          res.consume()
-        })
-
         redis.hget(headId, "title").map(title => {
           data.put(RESULT, true)
           data.put("title", title.get.utf8String)
@@ -267,6 +250,21 @@ class Dispatcher extends ScalaVerticle {
       }
     })
 
+    redis.smembers(keyChatMembers).map(members => {
+      res.addProducer(members.length)
+      data.put(MEMBERS, new JsonArray())
+      members foreach (m => {
+        redis.hget(USER + m.utf8String, "name").map(name => {
+          val user: JsonObject = new JsonObject()
+          user.put("id", m.utf8String)
+          user.put("name", name.get.utf8String)
+          data.getJsonArray(MEMBERS).add(user)
+
+          res.consume()
+        })
+      })
+      res.consume()
+    })
   }
 
 
@@ -307,7 +305,7 @@ class Dispatcher extends ScalaVerticle {
 
         redis.sadd(keyChatMembers, user).map(result => {
           if (result > 0) {
-            data.put(RESULT + "_" +CHATS, true)
+            data.put(RESULT + "_" + CHATS, true)
           } else {
             data.put(RESULT + "_" + CHATS, false)
             data.put(DETAILS + "_" + CHATS, "Utente già presente tra i membri della chat")
@@ -563,8 +561,6 @@ class Dispatcher extends ScalaVerticle {
 
 
   }*/
-
-
 
 
 }
