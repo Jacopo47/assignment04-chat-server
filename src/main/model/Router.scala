@@ -58,7 +58,14 @@ case class ConsumeBeforeRes() {
     counter += 1
     if (counter == limit) {
       responseJson(routingContext, data)
-      if (redisClient != null) redisClient.stop()
+      if (redisClient != null) {
+        redisClient.quit().map(fut => {
+          if (!fut) {
+            println("ERROR on closing connection")
+          }
+          redisClient.stop()
+        })
+      }
       counter = 0
       limit = 1
       data.clear()
