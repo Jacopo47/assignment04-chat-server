@@ -1,7 +1,8 @@
 package model
 
 import io.vertx.core.http.HttpMethod
-import io.vertx.lang.scala.json.JsonObject
+import io.vertx.core.json.JsonObject
+import io.vertx.lang.scala.json.{Json, JsonObject}
 import io.vertx.scala.ext.web.{Router, RoutingContext}
 import redis.RedisClient
 
@@ -13,23 +14,21 @@ trait Request {
 
   def method: HttpMethod
 
-  def data: JsonObject
-
-  def res: ConsumeBeforeRes
-
   def handle: (RoutingContext, JsonObject, ConsumeBeforeRes) => Unit
 
   def handler(): Unit = {
-    res.setData(data)
-    router.route(method, url).produces("application/json").handler(handle(_, data, res))
+    router.route(method, url).produces("application/json").handler(routingContext=> {
+      val res = ConsumeBeforeRes(routingContext)
+      val data = Json.emptyObj()
+      res.setData(data)
+      handle(routingContext, data, res)
+    })
   }
 }
 
 case class GET(override val router: Router,
                override val url: String,
-               override val handle: (RoutingContext, JsonObject, ConsumeBeforeRes) => Unit,
-               override val data: JsonObject = new JsonObject(),
-               override val res: ConsumeBeforeRes = ConsumeBeforeRes()) extends Request {
+               override val handle: (RoutingContext, JsonObject, ConsumeBeforeRes) => Unit) extends Request {
   override val method = HttpMethod.GET
 
   handler()
@@ -37,18 +36,15 @@ case class GET(override val router: Router,
 
 case class POST(override val router: Router,
                override val url: String,
-               override val handle: (RoutingContext, JsonObject, ConsumeBeforeRes) => Unit,
-               override val data: JsonObject = new JsonObject(),
-               override val res: ConsumeBeforeRes = ConsumeBeforeRes()) extends Request {
+               override val handle: (RoutingContext, JsonObject, ConsumeBeforeRes) => Unit) extends Request {
   override val method = HttpMethod.POST
 
   handler()
 }
 
-case class ConsumeBeforeRes() {
+case class ConsumeBeforeRes(routingContext: RoutingContext) {
   private var counter: Int = 0
   private var limit = 1
-  private var routingContext: RoutingContext = _
   private var data: JsonObject = _
   private var redisClient: RedisClient = _
   private var onCloseOperation: RedisClient => Unit = _
@@ -56,7 +52,7 @@ case class ConsumeBeforeRes() {
   def consume(): Unit = {
     counter += 1
     if (counter == limit) {
-      responseJson(routingContext, data)
+      responseJson()
       if (onCloseOperation != null) onCloseOperation(redisClient)
       counter = 0
       limit = 1
@@ -64,21 +60,18 @@ case class ConsumeBeforeRes() {
     }
   }
 
-  def initialize(routingContext: RoutingContext, limit: Int, redisClient: RedisClient = null, onClose: RedisClient => Unit = null): Unit = {
-    setRoutingContext(routingContext)
+  def initialize(limit: Int, redisClient: RedisClient = null, onClose: RedisClient => Unit = null): Unit = {
     setLimit(limit)
     setRedisClient(redisClient)
     setOnClose(onClose)
   }
 
-  def initialize(routingContext: RoutingContext, limit: Int, onClose: RedisClient => Unit): Unit = {
-    setRoutingContext(routingContext)
+  def initialize(limit: Int, onClose: RedisClient => Unit): Unit = {
     setLimit(limit)
     setOnClose(onClose)
   }
-  def setRoutingContext(routingContext: RoutingContext): Unit = this.routingContext = routingContext
 
-  def addProducer(qta: Int = 1) = this.limit += qta
+  def addProducer(qta: Int = 1): Unit = this.limit += qta
 
   def setLimit(limit: Int): Unit = this.limit = limit
 
@@ -88,11 +81,11 @@ case class ConsumeBeforeRes() {
 
   def setOnClose(onClose: RedisClient => Unit): Unit = this.onCloseOperation = onClose
 
-  private def responseJson(routingContext: RoutingContext, json: JsonObject): Unit = {
+  private def responseJson(): Unit = {
     routingContext.response()
       .setChunked(true)
       .putHeader("Content-Type", "application/json")
-      .write(json.encode())
+      .write(data.encode())
       .end()
   }
 }
