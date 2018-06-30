@@ -1,7 +1,6 @@
 package model
 
 import io.vertx.core.http.HttpMethod
-import io.vertx.core.json.JsonObject
 import io.vertx.lang.scala.json.{Json, JsonObject}
 import io.vertx.scala.ext.web.{Router, RoutingContext}
 import redis.RedisClient
@@ -17,7 +16,7 @@ trait Request {
   def handle: (RoutingContext, JsonObject, ConsumeBeforeRes) => Unit
 
   def handler(): Unit = {
-    router.route(method, url).produces("application/json").handler(routingContext=> {
+    router.route(method, url).produces("application/json").handler(routingContext => {
       val res = ConsumeBeforeRes(routingContext)
       val data = Json.emptyObj()
       res.setData(data)
@@ -35,8 +34,8 @@ case class GET(override val router: Router,
 }
 
 case class POST(override val router: Router,
-               override val url: String,
-               override val handle: (RoutingContext, JsonObject, ConsumeBeforeRes) => Unit) extends Request {
+                override val url: String,
+                override val handle: (RoutingContext, JsonObject, ConsumeBeforeRes) => Unit) extends Request {
   override val method = HttpMethod.POST
 
   handler()
