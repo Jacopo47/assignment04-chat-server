@@ -145,6 +145,12 @@ class Dispatcher extends ScalaVerticle {
     val redis = RedisClient(HOST, PORT, PASSWORD)
     res.initialize(1, redis, closeRedisClient)
 
+    if (routingContext.queryParams().isEmpty()) {
+      data.put(RESULT, false)
+      data.put(DETAILS, "Nessun parametro fornito in input")
+      res.consume()
+    }
+
     val params = new mutable.HashMap[String, String]
     routingContext.queryParams().names().foreach(e => {
       val value: String = routingContext.request().getParam(e).getOrElse("")
