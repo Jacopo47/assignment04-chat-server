@@ -231,7 +231,7 @@ class Dispatcher extends ScalaVerticle {
     val headId = CHATS + ":head:" + id
     val keyChatMembers = CHATS + ":" + id + ":members"
 
-    redis.exists(chatId).map(result => {
+    redis.exists(headId).map(result => {
       if (result) {
         redis.hget(headId, "title").map(title => {
           data.put(RESULT, true)
