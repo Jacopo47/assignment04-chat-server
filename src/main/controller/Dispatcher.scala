@@ -5,7 +5,7 @@ import java.net.InetSocketAddress
 import akka.actor.{ActorSystem, Props}
 import controller.Utility._
 import io.vertx.lang.scala.ScalaVerticle
-import io.vertx.lang.scala.json.{JsonArray, JsonObject}
+import io.vertx.lang.scala.json.{Json, JsonArray, JsonObject}
 import io.vertx.scala.ext.web.{Router, RoutingContext}
 import model.{ConsumeBeforeRes, GET, POST}
 import redis.RedisClient
@@ -27,6 +27,8 @@ object Utility {
   val RESULT = "result"
   val DETAILS = "details"
   val MEMBERS = "members"
+  val MSG = "msg"
+  val SENDER = "sender"
 }
 
 
@@ -56,8 +58,6 @@ class Dispatcher extends ScalaVerticle {
 
     GET(router, "/", hello)
 
-    //GET(router, "/type/:id", routingGETRequest)
-
     GET(router, "/user/:id", getUserData)
 
     POST(router, "/user/:id", setUserData)
@@ -69,6 +69,8 @@ class Dispatcher extends ScalaVerticle {
     POST(router, "/user/:id/removeChats", removeChat)
 
     GET(router, "/chats/:id", getChat)
+
+    GET(router, "/allChats", getAllChats)
 
     GET(router, "/chats/:id/head", getChatData)
 
@@ -268,6 +270,33 @@ class Dispatcher extends ScalaVerticle {
           res.consume()
         })
       })
+      res.consume()
+    })
+  }
+
+
+  /**
+    * Risponde a GET /chats/all
+    *
+    * Una lista gli id delle chat presenti nel sistema
+    */
+  private def getAllChats: (RoutingContext, JsonObject, ConsumeBeforeRes) => Unit = (routingContext, data, res) => {
+    val redis = RedisClient(HOST, PORT, PASSWORD)
+    res.initialize(1, redis, closeRedisClient)
+
+    data.put(CHATS, Json.emptyArr())
+
+    val chats = data.getJsonArray(CHATS)
+
+    val searchPattern = "chats:head:*"
+    redis.keys(searchPattern).map(keys => {
+      if (keys.isEmpty) {
+        data.put(RESULT, false)
+        data.put(DETAILS, "Nessuna chat registrata")
+      } else {
+        data.put(RESULT, true)
+        keys foreach (k => chats.add(k.replace("chats:head:", "")))
+      }
       res.consume()
     })
   }
@@ -498,76 +527,6 @@ class Dispatcher extends ScalaVerticle {
       res.consume()
     })
   }
-
-  /*
-  val routingGETRequest: (RoutingContext, JsonObject, ConsumeBeforeRes) => Unit = (routingContext, data, res) => {
-    res.initialize(routingContext, 3)
-
-    try {
-
-      data.put("vals", new JsonArray())
-
-
-      val redis = RedisClient(HOST, PORT, PASSWORD)
-
-
-      val future = redis.get("foo")
-
-      future.map(value => {
-        println("foo " concat value.get.utf8String)
-        data.getJsonArray("vals").add(value.get.utf8String)
-        res.consume()
-      })
-
-
-      val app = redis.get("foo1")
-
-      app.map(value => {
-
-        println("in get foo1" + value.get.utf8String)
-        data.getJsonArray("vals").add(value.get.utf8String)
-        res.consume()
-      })
-
-
-      redis.exists("me") map (exist => {
-        if (exist) {
-          redis.hgetall("me").map(me => {
-            println("in hgetall")
-            val app = new JsonObject()
-            if (me.nonEmpty) {
-              me foreach { case (k, v) =>
-                println(k + " / " + v.utf8String)
-                app.put(k, v.utf8String)
-              }
-            }
-            data.put("me", app)
-            res.consume()
-          })
-        } else {
-          data.put("me", "chiave inesistente")
-          res.consume()
-        }
-      })
-
-
-      routingContext.request().getParam("type") match {
-        case Some(reqType) => data.put("type", reqType)
-        case None => data.put("type", "none")
-      }
-
-      routingContext.request().getParam("id") match {
-        case Some(id) => data.put("id", id)
-        case None => data.put("id", "none")
-      }
-    } catch {
-      case e: Exception => println(e.printStackTrace())
-    }
-
-
-  }*/
-
-
 }
 
 
@@ -590,15 +549,23 @@ class SubscribeActor(channels: Seq[String] = Nil, patterns: Seq[String] = Nil)
   }
 
   def onPMessage(pmessage: PMessage) {
-    val chat = pmessage.channel.replaceFirst("chat.", CHATS + ":")
-    val msg = pmessage.data.utf8String
+    try {
+      val chat = pmessage.channel.replaceFirst("chat.", CHATS + ":")
+      val complexMsg = Json.fromObjectString(pmessage.data.utf8String)
 
-    val timestamp = System.currentTimeMillis()
+      var sender = complexMsg.getString(SENDER)
+      if (sender == null) sender = "unknown"
+      val msg = complexMsg.getString(MSG)
+      val timestamp = System.currentTimeMillis()
 
-    val element = new JsonObject().put("timestamp", timestamp)
-      .put("msg", msg).put("sender", "unknown")
+      val element = new JsonObject().put("timestamp", timestamp)
+        .put("msg", msg).put("sender", sender)
 
-    redis.rpush(chat, element.encode())
+      redis.rpush(chat, element.encode())
+    } catch {
+      case ex: Exception => println("Error on elaborate msg: " + pmessage.data.utf8String + "\nDetails: " + ex.getMessage)
+    }
+
   }
 }
 
