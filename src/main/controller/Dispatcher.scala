@@ -2,12 +2,13 @@ package controller
 
 import java.net.InetSocketAddress
 
-import akka.actor.{ActorSystem, Props}
+import akka.actor.{ActorRef, ActorSystem, Props}
 import controller.Utility._
 import io.vertx.lang.scala.ScalaVerticle
 import io.vertx.lang.scala.json.{Json, JsonArray, JsonObject}
 import io.vertx.scala.ext.web.{Router, RoutingContext}
-import model.{ConsumeBeforeRes, GET, POST}
+import model.Message.DeleteChatMsg
+import model.{BackgroundWorker, ConsumeBeforeRes, GET, POST}
 import redis.RedisClient
 import redis.actors.RedisSubscriberActor
 import redis.api.pubsub.{Message, PMessage}
@@ -32,20 +33,10 @@ object Utility {
 }
 
 
-class ConsumeThenRes(limit: Int)(res: => Unit) {
-  private var counter: Int = 0
-
-  def consume(): Unit = {
-    counter += 1
-    if (counter == limit) res
-  }
-}
-
-
 class Dispatcher extends ScalaVerticle {
   implicit val akkaSystem: ActorSystem = akka.actor.ActorSystem()
 
-
+  val backgroundWorker: ActorRef = akkaSystem.actorOf(Props(classOf[BackgroundWorker]))
   override def start(): Unit = {
 
 
@@ -405,6 +396,7 @@ class Dispatcher extends ScalaVerticle {
 
         redis.srem(keyChatMembers, user).map(result => {
           if (result > 0) {
+            backgroundWorker ! DeleteChatMsg(chat)
             data.put(RESULT + "_" + CHATS, true)
           } else {
             data.put(RESULT + "_" + CHATS, false)
@@ -432,6 +424,9 @@ class Dispatcher extends ScalaVerticle {
     })
 
   }
+
+
+
 
   /**
     * Risponde a GET /chats/new/
