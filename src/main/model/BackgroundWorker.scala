@@ -14,7 +14,7 @@ class BackgroundWorker extends Actor {
     case DeleteChatMsg(chatId) =>
       val redis = RedisClient(HOST, PORT, PASSWORD)
 
-      redis.scard(chatId).map(card => {
+      redis.scard(CHATS + ":" + chatId + ":members").map(card => {
         if (card == 0) {
           val chatHead = CHATS + ":head:" + chatId
           val chatMembers = CHATS + ":" + chatId + ":members"
