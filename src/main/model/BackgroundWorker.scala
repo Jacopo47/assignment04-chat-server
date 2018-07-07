@@ -21,7 +21,7 @@ class BackgroundWorker extends Actor {
           val chat = CHATS + ":" + chatId
           redis.del(chat, chatHead, chatMembers).map(delKeys => {
             if (delKeys > 0) {
-              redis.publish("chatDeleted", chatId).map(_ => {
+              redis.publish("chatDeleted." + chatId, chatId).map(_ => {
                 redis.quit().map(_ => {
                   redis.stop()
                 })
