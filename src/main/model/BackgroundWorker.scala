@@ -10,6 +10,10 @@ import scala.concurrent.ExecutionContext.Implicits.global
 class BackgroundWorker extends Actor {
   implicit val akkaSystem: ActorSystem = akka.actor.ActorSystem()
 
+  /**
+    *
+    * @return
+    */
   override def receive: Receive = {
     case DeleteChatMsg(chatId) =>
       val redis = RedisClient(HOST, PORT, PASSWORD)
