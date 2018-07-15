@@ -11,7 +11,8 @@ class BackgroundWorker extends Actor {
   implicit val akkaSystem: ActorSystem = akka.actor.ActorSystem()
 
   /**
-    *
+    * Risponde al messaggio DeleteChatMsg(chatId)
+    * Controlla se la chat ha ancora dei membri al suo interno, se non ne ha la elimina dal server e lo notifica
     * @return
     */
   override def receive: Receive = {

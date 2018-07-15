@@ -40,6 +40,9 @@ class Dispatcher extends ScalaVerticle {
   override def start(): Unit = {
 
 
+    /*
+      Si prelevano le variabili di ambiente.
+    */
     HOST = System.getenv("REDIS_HOST")
     PORT = System.getenv("REDIS_PORT").toInt
     PASSWORD = Some(System.getenv("REDIS_PW"))
@@ -81,7 +84,7 @@ class Dispatcher extends ScalaVerticle {
   }
 
   /**
-    * Restituisce i dati dell'utente, risponde a GET /user/:id
+    * Schermata di "Welcome"
     */
   private val hello: (RoutingContext, JsonObject, ConsumeBeforeRes) => Unit = (routingContext, data, res) => {
     res.initialize(1)
@@ -91,14 +94,7 @@ class Dispatcher extends ScalaVerticle {
 
   }
 
-  private def closeRedisClient(client: RedisClient): Unit = {
-    client.quit().map(fut => {
-      if (!fut) {
-        println("ERROR / Impossibile chiudere il client di redis")
-      }
-      client.stop()
-    })
-  }
+
 
   /**
     * Restituisce i dati dell'utente, risponde a GET /user/:id
@@ -149,9 +145,6 @@ class Dispatcher extends ScalaVerticle {
       val value: String = routingContext.request().getParam(e).getOrElse("")
 
       if (!value.isEmpty) params.put(e.trim, value.trim)
-      /*routingContext.request().getParam(e) match {
-        case Some(value) => if (!value.isEmpty) params.put(e.trim, value.trim)
-      }*/
     })
 
     val id: String = USER + routingContext.request().getParam("id").getOrElse("").trim
@@ -461,9 +454,6 @@ class Dispatcher extends ScalaVerticle {
       val value: String = routingContext.request().getParam(e).getOrElse("")
 
       if (!value.isEmpty) params.put(e.trim, value.trim)
-      /*routingContext.request().getParam(e) match {
-        case Some(value) => if (!value.isEmpty) params.put(e.trim, value.trim)
-      }*/
     })
 
     val id: String = CHATS + ":head:" + routingContext.request().getParam("id").getOrElse("").trim
@@ -520,6 +510,21 @@ class Dispatcher extends ScalaVerticle {
         data.put(RESULT, false)
       }
       res.consume()
+    })
+  }
+
+
+  /**
+    * Metodo che si occupa di chiudere il client di redis fornito come parametro e di stopparne l'attore
+    * @param client
+    * Redis client
+    */
+  private def closeRedisClient(client: RedisClient): Unit = {
+    client.quit().map(fut => {
+      if (!fut) {
+        println("ERROR / Impossibile chiudere il client di redis")
+      }
+      client.stop()
     })
   }
 }

@@ -6,6 +6,9 @@ import io.vertx.scala.ext.web.{Router, RoutingContext}
 import redis.RedisClient
 
 
+/**
+  * Interfaccio per la gestione di una richiesta proveniente dal server di Vertx.
+  */
 trait Request {
   def router: Router
 
@@ -25,6 +28,16 @@ trait Request {
   }
 }
 
+
+/**
+  * Tipo di richiesta GET
+  * @param router
+  *        Oggetto che si occupa del routing
+  * @param url
+  *        URL da gestire
+  * @param handle
+  *        Funzione che si occupa di gestire la richiesta e di produrre una risposta
+  */
 case class GET(override val router: Router,
                override val url: String,
                override val handle: (RoutingContext, JsonObject, ConsumeBeforeRes) => Unit) extends Request {
@@ -33,6 +46,15 @@ case class GET(override val router: Router,
   handler()
 }
 
+/**
+  * Tipo di richiesta POST
+  * @param router
+  *        Oggetto che si occupa del routing
+  * @param url
+  *        URL da gestire
+  * @param handle
+  *        Funzione che si occupa di gestire la richiesta e di produrre una risposta
+  */
 case class POST(override val router: Router,
                 override val url: String,
                 override val handle: (RoutingContext, JsonObject, ConsumeBeforeRes) => Unit) extends Request {
@@ -41,6 +63,12 @@ case class POST(override val router: Router,
   handler()
 }
 
+/**
+  * Produttore / Consumatore per attendere il completamento delle future e delle interazioni con il database.
+  * Una volta consumati tutti i "token" produce una risposta.
+  * @param routingContext
+  *         Oggetto con i riferimenti alla richiesta.
+  */
 case class ConsumeBeforeRes(routingContext: RoutingContext) {
   private var counter: Int = 0
   private var limit = 1
