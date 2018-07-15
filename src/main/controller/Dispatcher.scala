@@ -7,7 +7,7 @@ import controller.Utility._
 import io.vertx.lang.scala.ScalaVerticle
 import io.vertx.lang.scala.json.{Json, JsonArray, JsonObject}
 import io.vertx.scala.ext.web.{Router, RoutingContext}
-import model.Message.DeleteChatMsg
+import model.message.DeleteChatMsg
 import model.{BackgroundWorker, ConsumeBeforeRes, GET, POST}
 import redis.RedisClient
 import redis.actors.RedisSubscriberActor

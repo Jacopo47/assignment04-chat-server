@@ -2,7 +2,7 @@ package model
 
 import akka.actor.{Actor, ActorSystem}
 import controller.Utility.{CHATS, HOST, PASSWORD, PORT}
-import model.Message.DeleteChatMsg
+import model.message.DeleteChatMsg
 import redis.RedisClient
 
 import scala.concurrent.ExecutionContext.Implicits.global
